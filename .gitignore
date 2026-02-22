@@ -45,6 +45,9 @@ Desktop.ini
 # Claude
 .claude/
 
+# GitHub hooks
+.github/hooks/
+
 # Arduino
 firmware/*.elf
 firmware/*.hex

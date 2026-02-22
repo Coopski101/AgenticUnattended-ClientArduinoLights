@@ -10,7 +10,7 @@
 #include <Arduino.h>
 
 #define RED_PIN   5
-#define GREEN_PIN 6
+#define GREEN_PIN 7
 
 #define PULSE_ON_MS  500
 #define PULSE_OFF_MS 500
