@@ -15,15 +15,16 @@ A .NET console app that connects to the beacon-core SSE server, receives AI agen
 
 The beacon-core server tracks AI agent activity across all open VS Code windows and publishes state changes over SSE (see [BEACON_WIRE_PROTOCOL.md](BEACON_WIRE_PROTOCOL.md) for full details). The bridge client:
 
-1. Checks `/health` and waits (with exponential backoff) until the server is available.
-2. Opens an SSE connection to `/events` and reads the `event:` / `data:` frames.
+1. Discovers the Arduino by sending `H` on each available COM port and waiting for an `OK` reply. If `ComPort` is set in config, only that port is tried. If no beacon is found, retries all ports with exponential backoff.
+2. Checks `/health` and waits (with exponential backoff) until the SSE server is available.
+3. Opens an SSE connection to `/events` and reads the `event:` / `data:` frames.
 3. Tracks per-session state in a dictionary keyed by `sessionId`.
-4. Aggregates all sessions into a single indicator command using priority rules:
+5. Aggregates all sessions into a single indicator command using priority rules:
    - **Any session Waiting** → send `W` (red flash — agent needs attention)
    - **Any session Done** (none waiting) → send `D` (green flash — agent finished)
    - **All sessions Clear/Idle** → send `C` (lights off)
-5. Sends the command over serial only when the aggregate state changes (de-duplicated).
-6. On disconnect, reconnects with exponential backoff.
+6. Sends the command over serial only when the aggregate state changes (de-duplicated).
+7. On disconnect, reconnects with exponential backoff.
 
 This means the Arduino only ever receives a single-letter command reflecting the overall state of all agent sessions, keeping the firmware simple.
 
@@ -48,6 +49,7 @@ This means the Arduino only ever receives a single-letter command reflecting the
 
 | Command | Meaning | LED Behavior |
 |---------|---------|--------------|
+| `H` | Handshake | Replies `OK\n` (used for port discovery) |
 | `W` | Waiting | Red light flashing (500 ms pulse) |
 | `D` | Done | Green light flashing (500 ms pulse) |
 | `C` | Clear | Both lights off |

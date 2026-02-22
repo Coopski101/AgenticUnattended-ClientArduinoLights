@@ -31,10 +31,10 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-SerialPort? serial = OpenSerial(config.ComPort, config.BaudRate);
+SerialPort? serial = await DiscoverArduino(config.ComPort, config.BaudRate, cts.Token);
 if (serial is null)
 {
-    log.LogCritical("No serial port found. Exiting.");
+    log.LogCritical("No beacon Arduino found. Exiting.");
     return;
 }
 
@@ -196,26 +196,61 @@ async Task WaitForHealth(HttpClient http, string baseUrl, CancellationToken ct)
     ct.ThrowIfCancellationRequested();
 }
 
-SerialPort? OpenSerial(string? portName, int baud)
+async Task<SerialPort?> DiscoverArduino(string? preferredPort, int baud, CancellationToken ct)
 {
-    if (!string.IsNullOrEmpty(portName))
+    int delay = config.ReconnectBaseMs;
+    while (!ct.IsCancellationRequested)
     {
-        SerialPort sp = new(portName, baud);
-        sp.Open();
-        return sp;
-    }
+        string[] ports = !string.IsNullOrEmpty(preferredPort)
+            ? [preferredPort]
+            : SerialPort.GetPortNames();
 
-    foreach (string name in SerialPort.GetPortNames())
-    {
+        foreach (string name in ports)
+        {
+            if (ct.IsCancellationRequested)
+                return null;
+
+            log.LogDebug("Probing {PortName}...", name);
+            SerialPort? sp = null;
+            try
+            {
+                sp = new SerialPort(name, baud) { ReadTimeout = 2000, WriteTimeout = 1000 };
+                sp.Open();
+                Thread.Sleep(2000);
+                sp.DiscardInBuffer();
+                sp.Write("H");
+                string reply = sp.ReadLine().Trim();
+                if (reply == "OK")
+                {
+                    sp.ReadTimeout = SerialPort.InfiniteTimeout;
+                    sp.WriteTimeout = SerialPort.InfiniteTimeout;
+                    log.LogInformation("Handshake OK on {PortName}", name);
+                    return sp;
+                }
+                log.LogDebug("Unexpected reply on {PortName}: {Reply}", name, reply);
+                sp.Close();
+            }
+            catch (Exception ex)
+            {
+                log.LogDebug("Probe failed on {PortName}: {Message}", name, ex.Message);
+                try
+                {
+                    sp?.Close();
+                }
+                catch { }
+            }
+        }
+
+        log.LogWarning("No beacon found — retrying in {DelayMs}ms...", delay);
         try
         {
-            SerialPort sp = new(name, baud);
-            sp.Open();
-            log.LogInformation("Auto-detected serial port: {PortName}", name);
-            return sp;
+            await Task.Delay(delay, ct);
         }
-        catch { }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+        delay = Math.Min(delay * 2, config.ReconnectMaxMs);
     }
-
     return null;
 }

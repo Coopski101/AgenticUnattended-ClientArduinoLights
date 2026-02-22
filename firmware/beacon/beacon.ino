@@ -32,6 +32,7 @@ void loop() {
   if (Serial.available()) {
     char cmd = Serial.read();
     switch (cmd) {
+      case 'H': Serial.println("OK"); break;
       case 'W': currentState = STATE_WAITING; pulseOn = true; lastToggleMs = millis(); break;
       case 'D': currentState = STATE_DONE;    pulseOn = true; lastToggleMs = millis(); break;
       case 'C': currentState = STATE_IDLE;    break;
