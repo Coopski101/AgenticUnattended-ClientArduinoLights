@@ -42,6 +42,9 @@ ehthumbs.db
 Desktop.ini
 .DS_Store
 
+# Claude
+.claude/
+
 # Arduino
 firmware/*.elf
 firmware/*.hex
