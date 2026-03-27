@@ -49,10 +49,19 @@ This means the Arduino only ever receives a single-letter command reflecting the
 
 | Command | Meaning | LED Behavior |
 |---------|---------|--------------|
-| `H` | Handshake | Replies `OK\n` (used for port discovery) |
+| `H` | Handshake | Replies `OK\n`, then both lights rapid-flash 6× (60 ms on/off) |
 | `W` | Waiting | Red light flashing (500 ms pulse) |
 | `D` | Done | Green light flashing (500 ms pulse) |
 | `C` | Clear | Both lights off |
+
+## LED Patterns
+
+### Boot (power-on)
+1. **Alternating red/green** — 6 cycles, 150 ms each (red on → green on → repeat)
+2. **Both lights simultaneous** — 3 flashes, 200 ms on / 200 ms off
+
+### Connected (handshake accepted)
+- **Both lights rapid-flash** — 6 cycles, 60 ms on / 60 ms off
 
 ## Configuration
 

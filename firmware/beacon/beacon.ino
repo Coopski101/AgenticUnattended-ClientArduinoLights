@@ -20,19 +20,49 @@ State currentState = STATE_IDLE;
 unsigned long lastToggleMs = 0;
 bool pulseOn = false;
 
+void bootFlash() {
+  for (int i = 0; i < 6; i++) {
+    digitalWrite(RED_PIN, HIGH);
+    digitalWrite(GREEN_PIN, LOW);
+    delay(150);
+    digitalWrite(RED_PIN, LOW);
+    digitalWrite(GREEN_PIN, HIGH);
+    delay(150);
+  }
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(RED_PIN, HIGH);
+    digitalWrite(GREEN_PIN, HIGH);
+    delay(200);
+    digitalWrite(RED_PIN, LOW);
+    digitalWrite(GREEN_PIN, LOW);
+    delay(200);
+  }
+}
+
 void setup() {
   Serial.begin(9600);
   pinMode(RED_PIN, OUTPUT);
   pinMode(GREEN_PIN, OUTPUT);
   digitalWrite(RED_PIN, LOW);
   digitalWrite(GREEN_PIN, LOW);
+  bootFlash();
 }
 
 void loop() {
   if (Serial.available()) {
     char cmd = Serial.read();
     switch (cmd) {
-      case 'H': Serial.println("OK"); break;
+      case 'H':
+        Serial.println("OK");
+        for (int i = 0; i < 6; i++) {
+          digitalWrite(RED_PIN, HIGH);
+          digitalWrite(GREEN_PIN, HIGH);
+          delay(50);
+          digitalWrite(RED_PIN, LOW);
+          digitalWrite(GREEN_PIN, LOW);
+          delay(50);
+        }
+        break;
       case 'W': currentState = STATE_WAITING; pulseOn = true; lastToggleMs = millis(); break;
       case 'D': currentState = STATE_DONE;    pulseOn = true; lastToggleMs = millis(); break;
       case 'C': currentState = STATE_IDLE;    break;
