@@ -1,0 +1,15 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ArduinoBridge.MainWindow"
+        Title="Arduino Beacon Bridge"
+        Width="700" Height="400"
+        WindowStartupLocation="CenterScreen">
+    <TextBox x:Name="LogBox"
+             IsReadOnly="True"
+             AcceptsReturn="True"
+             TextWrapping="Wrap"
+             FontFamily="Cascadia Mono, Consolas, Menlo, monospace"
+             FontSize="13"
+             BorderThickness="0"
+             Padding="8"/>
+</Window>
