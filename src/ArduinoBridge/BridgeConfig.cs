@@ -7,4 +7,5 @@ public sealed class BridgeConfig
     public int BaudRate { get; set; } = 9600;
     public int ReconnectBaseMs { get; set; } = 1000;
     public int ReconnectMaxMs { get; set; } = 30000;
+    public int HandshakeDelayMs { get; set; } = 2000;
 }

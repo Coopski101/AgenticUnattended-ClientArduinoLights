@@ -1,22 +1,24 @@
-using System.IO.Ports;
 using System.Net.Http.Headers;
-using System.Text.Json;
 
 namespace ArduinoBridge;
 
 public sealed class BridgeService : IDisposable
 {
     private readonly BridgeConfig _config;
-    private readonly HttpClient _http = new() { Timeout = Timeout.InfiniteTimeSpan };
-    private readonly Dictionary<string, string> _sessions = new();
-    private SerialPort? _serial;
+    private readonly HttpClient _http;
+    private readonly SessionTracker _tracker;
+    private readonly ISerialPortFactory _serialFactory;
+    private ISerialPort? _serial;
     private string _lastCommand = "";
 
     public event Action<string>? LogMessage;
 
-    public BridgeService(BridgeConfig config)
+    public BridgeService(BridgeConfig config, HttpMessageHandler? httpHandler = null, ISerialPortFactory? serialFactory = null)
     {
         _config = config;
+        _http = new HttpClient(httpHandler ?? new HttpClientHandler()) { Timeout = Timeout.InfiniteTimeSpan };
+        _tracker = new SessionTracker();
+        _serialFactory = serialFactory ?? new SystemSerialPortFactory();
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -30,7 +32,7 @@ public sealed class BridgeService : IDisposable
             return;
         }
 
-        Log($"Serial: {_serial.PortName} @ {_serial.BaudRate}");
+        Log($"Serial: {_serial.PortName}");
 
         int backoff = _config.ReconnectBaseMs;
 
@@ -62,7 +64,8 @@ public sealed class BridgeService : IDisposable
                         eventType = line["event:".Length..].Trim();
                     else if (line.StartsWith("data:") && eventType is not null)
                     {
-                        ProcessEvent(eventType, line["data:".Length..].Trim());
+                        string command = _tracker.ProcessEvent(eventType, line["data:".Length..].Trim());
+                        SendCommand(command);
                         eventType = null;
                     }
                 }
@@ -88,44 +91,6 @@ public sealed class BridgeService : IDisposable
         SendCommand("C");
         _serial.Close();
         Log("Goodbye.");
-    }
-
-    private void ProcessEvent(string eventType, string json)
-    {
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-        string sessionId = root.GetProperty("sessionId").GetString() ?? "";
-
-        switch (eventType)
-        {
-            case "Waiting":
-                _sessions[sessionId] = "Waiting";
-                break;
-            case "Done":
-                _sessions[sessionId] = "Done";
-                break;
-            case "Clear":
-                _sessions[sessionId] = "Clear";
-                break;
-            case "SessionEnded":
-                _sessions.Remove(sessionId);
-                break;
-        }
-
-        Reconcile();
-    }
-
-    private void Reconcile()
-    {
-        string command;
-        if (_sessions.Values.Any(v => v == "Waiting"))
-            command = "W";
-        else if (_sessions.Values.Any(v => v == "Done"))
-            command = "D";
-        else
-            command = "C";
-
-        SendCommand(command);
     }
 
     private void SendCommand(string cmd)
@@ -162,37 +127,38 @@ public sealed class BridgeService : IDisposable
         ct.ThrowIfCancellationRequested();
     }
 
-    private async Task<SerialPort?> DiscoverArduino(string? preferredPort, int baud, CancellationToken ct)
+    private async Task<ISerialPort?> DiscoverArduino(string? preferredPort, int baud, CancellationToken ct)
     {
         int delay = _config.ReconnectBaseMs;
         while (!ct.IsCancellationRequested)
         {
             string[] ports = !string.IsNullOrEmpty(preferredPort)
                 ? [preferredPort]
-                : SerialPort.GetPortNames();
+                : _serialFactory.GetPortNames();
 
             foreach (string name in ports)
             {
                 if (ct.IsCancellationRequested) return null;
 
-                SerialPort? sp = null;
+                ISerialPort? sp = null;
                 try
                 {
-                    sp = new SerialPort(name, baud) { ReadTimeout = 2000, WriteTimeout = 1000 };
+                    sp = _serialFactory.Create(name, baud, 2000, 1000);
                     sp.Open();
-                    Thread.Sleep(2000);
+                    await Task.Delay(_config.HandshakeDelayMs, ct);
                     sp.DiscardInBuffer();
                     sp.Write("H");
                     string reply = sp.ReadLine().Trim();
                     if (reply == "OK")
                     {
-                        sp.ReadTimeout = SerialPort.InfiniteTimeout;
-                        sp.WriteTimeout = SerialPort.InfiniteTimeout;
+                        sp.ReadTimeout = -1;
+                        sp.WriteTimeout = -1;
                         Log($"Handshake OK on {name}");
                         return sp;
                     }
                     sp.Close();
                 }
+                catch (OperationCanceledException) { sp?.Dispose(); return null; }
                 catch
                 {
                     try { sp?.Close(); } catch { }
