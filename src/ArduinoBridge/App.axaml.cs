@@ -49,6 +49,14 @@ public partial class App : Application
             _mainWindow?.Activate();
         };
 
+        var autoStartItem = new NativeMenuItem(AutoStart.IsEnabled() ? "✓ Start at Login" : "  Start at Login");
+        autoStartItem.Click += (_, _) =>
+        {
+            bool next = !AutoStart.IsEnabled();
+            AutoStart.SetEnabled(next);
+            autoStartItem.Header = next ? "✓ Start at Login" : "  Start at Login";
+        };
+
         var exitItem = new NativeMenuItem("Exit");
         exitItem.Click += (_, _) =>
         {
@@ -62,7 +70,7 @@ public partial class App : Application
         var trayIcon = new TrayIcon
         {
             ToolTipText = "Arduino Beacon Bridge",
-            Menu = new NativeMenu { showItem, new NativeMenuItemSeparator(), exitItem },
+            Menu = new NativeMenu { showItem, autoStartItem, new NativeMenuItemSeparator(), exitItem },
             IsVisible = true
         };
 
