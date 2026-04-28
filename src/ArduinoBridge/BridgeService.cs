@@ -148,6 +148,7 @@ public sealed class BridgeService : IDisposable
                     await Task.Delay(_config.HandshakeDelayMs, ct);
                     sp.DiscardInBuffer();
                     sp.Write("H");
+                    await Task.Delay(_config.HandshakeDelayMs, ct);
                     string reply = sp.ReadLine().Trim();
                     if (reply == "OK")
                     {
